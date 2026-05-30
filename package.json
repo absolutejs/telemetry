@@ -1,0 +1,48 @@
+{
+	"name": "@absolutejs/telemetry",
+	"version": "0.0.1",
+	"description": "Tiny shared OpenTelemetry substrate for the AbsoluteJS ecosystem. Type-replicates @opentelemetry/api's Tracer/Span shape, ships noop implementations and a tracerOrNoop helper, and pins ABS_ATTRS semantic conventions so spans from runtime / sync / queue / router / secrets all use the same attribute names.",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/absolutejs/telemetry.git"
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"type": "module",
+	"license": "Apache-2.0",
+	"author": "Alex Kahn",
+	"publishConfig": {
+		"access": "public"
+	},
+	"keywords": [
+		"opentelemetry",
+		"otel",
+		"observability",
+		"tracing",
+		"absolutejs"
+	],
+	"scripts": {
+		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun && tsc --project tsconfig.build.json",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"format": "prettier --write \"./**/*.{ts,json,md}\"",
+		"release": "bun run format && bun run build && bun publish"
+	},
+	"devDependencies": {
+		"@types/bun": "1.3.14",
+		"prettier": "3.5.3",
+		"typescript": "5.8.3"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	]
+}
