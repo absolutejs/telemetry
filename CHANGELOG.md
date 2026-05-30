@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.3] — 2026-05-30
+
+### Added — `readActiveTraceId()` helper
+
+Extracts the "dynamic-optional `@opentelemetry/api` import to read the
+active span's trace id" pattern out of `@absolutejs/audit-elysia` (and
+anywhere else that wanted to attach `metadata.traceId` to a non-span
+artifact). The single place in the substrate that does this dynamic
+import.
+
+- Returns `string | undefined`. Resolves to `undefined` when OTel
+  isn't installed OR when no span is active. No throws.
+- Module specifier built at runtime so bundlers don't statically
+  resolve `@opentelemetry/api` — truly optional dep.
+
+2 new tests; 13 → 15.
+
 ## [0.0.2] — 2026-05-30
 
 ### Added — `Tracer.startSpan(name, options?)`

@@ -348,3 +348,53 @@ export const withSpanSync = <T>(
 			span.end();
 		}
 	});
+
+// -----------------------------------------------------------------------------
+// Active trace-context lookup
+// -----------------------------------------------------------------------------
+
+/**
+ * Read the active span's `traceId` if `@opentelemetry/api` is installed
+ * AND a span is currently active. Returns `undefined` otherwise. Used
+ * by packages that want to attach `metadata.traceId` to non-span
+ * artifacts (audit events, error reports, log lines) without taking a
+ * peer-dep on `@opentelemetry/api`.
+ *
+ * The module specifier is built at runtime so TypeScript / bundlers
+ * don't statically resolve `@opentelemetry/api` — it's a truly
+ * optional dependency. When OTel isn't installed, the import resolves
+ * to `null` and the helper returns `undefined`.
+ *
+ * Added in 0.0.3.
+ *
+ * @example
+ * ```ts
+ * import { readActiveTraceId } from '@absolutejs/telemetry';
+ *
+ * const traceId = await readActiveTraceId();
+ * if (traceId !== undefined) {
+ *   auditEvent.metadata.traceId = traceId;
+ * }
+ * ```
+ */
+export const readActiveTraceId = async (): Promise<string | undefined> => {
+	try {
+		const specifier = ['@opentelemetry', 'api'].join('/');
+		const otel = (await import(specifier).catch(() => null)) as
+			| null
+			| {
+					trace: {
+						getActiveSpan: () =>
+							| { spanContext: () => { traceId: string } }
+							| undefined;
+					};
+				};
+		if (otel === null) return undefined;
+		const span = otel.trace.getActiveSpan?.();
+		if (!span) return undefined;
+		const ctx = span.spanContext?.();
+		return ctx?.traceId;
+	} catch {
+		return undefined;
+	}
+};

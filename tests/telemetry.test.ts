@@ -248,6 +248,21 @@ describe('withSpanSync() — sync wrapper', () => {
 	});
 });
 
+describe('readActiveTraceId() — 0.0.3', () => {
+	test('returns undefined when @opentelemetry/api is not installed', async () => {
+		const { readActiveTraceId } = await import('../src/index');
+		const traceId = await readActiveTraceId();
+		expect(traceId).toBeUndefined();
+	});
+
+	test('handles dynamic import failure gracefully (no throw)', async () => {
+		const { readActiveTraceId } = await import('../src/index');
+		// In the test environment OTel isn't installed; just verify
+		// the helper never throws.
+		await expect(readActiveTraceId()).resolves.toBeUndefined();
+	});
+});
+
 describe('ABS_ATTRS — semantic conventions', () => {
 	test('attribute names are stable strings', () => {
 		// Treat as part of the public contract — these are the names

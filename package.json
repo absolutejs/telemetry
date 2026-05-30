@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/telemetry",
-	"version": "0.0.2",
+	"version": "0.0.3",
 	"description": "Tiny shared OpenTelemetry substrate for the AbsoluteJS ecosystem. Type-replicates @opentelemetry/api's Tracer/Span shape, ships noop implementations and a tracerOrNoop helper, and pins ABS_ATTRS semantic conventions so spans from runtime / sync / queue / router / secrets all use the same attribute names.",
 	"repository": {
 		"type": "git",
