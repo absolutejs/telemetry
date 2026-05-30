@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.2] — 2026-05-30
+
+### Added — `Tracer.startSpan(name, options?)`
+
+`startActiveSpan(name, options, fn)` forces a callback shape that's
+awkward to wrap around long-running inline code (engine.runMutation's
+~150-line retry loop, etc.). `startSpan` returns the Span directly so
+the caller manages `setStatus` / `recordException` / `end` themselves,
+in a regular try/catch/finally. Parent linking still works via OTel's
+active-context lookup (standard behavior).
+
+Noop tracer's `startSpan` returns the singleton noop span. Mock
+tracers in test code need to add a `startSpan` field; the public
+`Tracer` type requires it now.
+
 ## [0.0.1] — 2026-05-30
 
 Initial preview. Tiny shared OpenTelemetry substrate for the

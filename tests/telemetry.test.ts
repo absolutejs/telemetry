@@ -40,6 +40,7 @@ const makeMockTracer = (): {
 		ended: boolean;
 	}> = [];
 	const tracer: Tracer = {
+		startSpan: () => createNoopSpan(),
 		startActiveSpan: ((
 			name: string,
 			optionsOrFn: unknown,

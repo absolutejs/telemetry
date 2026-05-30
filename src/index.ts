@@ -124,6 +124,16 @@ export type Span = {
 
 /** A tracer — what you get from `tracerProvider.getTracer(name)`. */
 export type Tracer = {
+	/**
+	 * Create a span without setting it as the active context. Returns
+	 * the Span directly — the caller manages `setStatus` /
+	 * `recordException` / `end` lifecycle. Most useful for long-running
+	 * code where the callback shape of `startActiveSpan` is awkward.
+	 *
+	 * The new span automatically links to the currently-active span as
+	 * its parent (standard OTel behavior).
+	 */
+	startSpan(name: string, options?: SpanOptions): Span;
 	startActiveSpan<T>(name: string, fn: (span: Span) => T): T;
 	startActiveSpan<T>(
 		name: string,
@@ -173,7 +183,8 @@ const startActiveSpanNoop = <T>(
 };
 
 const noopTracer: Tracer = {
-	startActiveSpan: startActiveSpanNoop as Tracer['startActiveSpan']
+	startActiveSpan: startActiveSpanNoop as Tracer['startActiveSpan'],
+	startSpan: () => noopSpan
 };
 
 /** Returns a tracer whose `startActiveSpan` invokes the callback with a
