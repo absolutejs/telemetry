@@ -3,6 +3,8 @@
 Tiny shared OpenTelemetry substrate for the AbsoluteJS substrate
 packages.
 
+**Docs:** [absolutejs.com/documentation/telemetry-overview](https://absolutejs.com/documentation/telemetry-overview)
+
 **What it is.** Type-replicated OTel surface + noop implementations +
 the `tracerOrNoop()` helper + `ABS_ATTRS` semantic conventions. ~250
 LOC, zero runtime deps.
