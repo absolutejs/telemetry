@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.1.0] — 2026-05-31
+
+Closes the third piece of G9 (observability triad) — the substrate
+now has a bundled OTLP-HTTP-JSON span exporter. The instrumentation
+investment across `runtime` / `sync` / `queue` / `router` /
+`secrets` / `rate-limit` / `isolated-jsc` finally has a one-line
+"send to OTel collector" path that doesn't require operators to
+wire `@opentelemetry/sdk-node` themselves.
+
+### Added — `@absolutejs/telemetry/otlp-http` subpath
+
+- **`createOtlpTracerProvider({ endpoint, serviceName, … })`**
+  returns an `OtlpTracerProvider` that satisfies the
+  `TracerProvider` interface from the root subpath. Pass it to any
+  substrate package's `tracerProvider` option and spans leave the
+  process.
+- **OTLP/JSON wire format.** Standardized HTTP encoding; works
+  against the OTel Collector, Grafana Agent, Tempo, Honeycomb,
+  Datadog (via OTLP intake), Lightstep, etc.
+- **Zero dependencies.** No `@opentelemetry/sdk-node`, no
+  `@opentelemetry/api`, no protobuf runtime. ~500 lines we own.
+- **Head-based ratio sampling.** Sampled at root; every child of a
+  sampled trace inherits. Non-sampled spans skip serialization
+  entirely (zero overhead).
+- **Batching.** `maxBatchSize` (default 512) + `scheduledDelayMs`
+  (default 5000) + `maxQueueSize` (default 2048). Queue overflow
+  counted in `metrics().droppedDueToQueueLimit` so operators can
+  spot back-pressure.
+- **Standard attribute encoding.** Strings, integers, doubles,
+  booleans, arrays of primitives — per OTLP/JSON spec
+  (`stringValue` / `intValue` (string) / `doubleValue` /
+  `boolValue` / `arrayValue`).
+- **Exceptions + status.** `recordException(err)` emits a standard
+  OTel `exception` event with `exception.message` /
+  `exception.type` / `exception.stacktrace`. `setStatus` maps to
+  `STATUS_CODE_OK` / `STATUS_CODE_ERROR` / `STATUS_CODE_UNSET`.
+- **Resource attributes.** Required `serviceName` + optional
+  `serviceVersion` + arbitrary `resourceAttributes` for region /
+  deployment.environment / etc.
+- **Operator visibility.** `provider.metrics()` returns
+  `{ queued, exported, droppedDueToQueueLimit, sampled,
+  notSampled, batches, batchErrors }`.
+- **`flush()` + `shutdown()`.** `flush()` drains the queue;
+  `shutdown()` flushes + closes so further spans don't enqueue.
+
+### Limitations (intentional — use `@opentelemetry/sdk-node` if you need them)
+
+- No async context propagation across `await` boundaries — each
+  `tracer.startSpan(name)` creates a fresh root unless the caller
+  threads the parent.
+- No inbound `traceparent` parsing — that's the HTTP layer's job.
+- No OTLP/Protobuf encoding — JSON is universal and zero-dep.
+- Spans only — no metric/log exports through this provider.
+
+### Tests
+
+17 new tests across span lifecycle, attribute encoding, events +
+status + exceptions, sampling (0% / 100% / isRecording), batching
+(full-batch trigger, queue overflow), error handling (non-2xx,
+fetch rejection), custom headers + resource attributes, shutdown
+drain, multi-batch metrics accumulation, `startActiveSpan`.
+
+### Build
+
+Added `src/otlpHttp.ts` as a second bundle entry. `./otlp-http`
+subpath in `exports`. Build uses `--root src` for clean
+`dist/<name>.js` layout.
+
 ## [0.0.3] — 2026-05-30
 
 ### Added — `readActiveTraceId()` helper
