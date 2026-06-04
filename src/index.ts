@@ -55,12 +55,21 @@
 /** Trace flags (W3C trace context). */
 export type TraceFlags = number;
 
+/** W3C tracestate carrier — mirrors `@opentelemetry/api`'s `TraceState` exactly
+ *  so an OTel `SpanContext` is structurally assignable to ours. */
+export type TraceState = {
+	set(key: string, value: string): TraceState;
+	unset(key: string): TraceState;
+	get(key: string): string | undefined;
+	serialize(): string;
+};
+
 /** Span context — the bits that travel across boundaries. */
 export type SpanContext = {
 	traceId: string;
 	spanId: string;
 	traceFlags: TraceFlags;
-	traceState?: { serialize(): string };
+	traceState?: TraceState;
 	isRemote?: boolean;
 };
 
@@ -88,17 +97,22 @@ export type SpanStatus = {
 	message?: string;
 };
 
-/** OTel attribute value — primitives and arrays of primitives. */
+// OTel attribute value — primitives and arrays of primitives. Mirrors
+// `@opentelemetry/api`'s `AttributeValue` EXACTLY (including the nullable array
+// element types) so a real OTel `TracerProvider` is structurally assignable to
+// ours with no cast at the consumer boundary.
 export type AttributeValue =
 	| string
 	| number
 	| boolean
-	| string[]
-	| number[]
-	| boolean[]
-	| undefined;
+	| Array<null | undefined | string>
+	| Array<null | undefined | number>
+	| Array<null | undefined | boolean>;
 
-export type Attributes = Record<string, AttributeValue>;
+// Index signature mirrors OTel's `Attributes` (values may be `undefined`).
+export type Attributes = {
+	[attributeKey: string]: AttributeValue | undefined;
+};
 
 /** Span options accepted by `startActiveSpan`. */
 export type SpanOptions = {

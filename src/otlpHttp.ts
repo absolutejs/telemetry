@@ -193,7 +193,9 @@ type OtlpAnyValue =
 	| { boolValue: boolean }
 	| { arrayValue: { values: OtlpAnyValue[] } };
 
-const encodeValue = (value: AttributeValue): OtlpAnyValue | undefined => {
+const encodeValue = (
+	value: AttributeValue | undefined
+): OtlpAnyValue | undefined => {
 	if (value === undefined) return undefined;
 	if (typeof value === 'string') return { stringValue: value };
 	if (typeof value === 'boolean') return { boolValue: value };
