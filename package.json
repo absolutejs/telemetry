@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/telemetry",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Tiny shared OpenTelemetry substrate for the AbsoluteJS ecosystem. Type-replicates @opentelemetry/api's Tracer/Span shape, ships noop implementations + a tracerOrNoop helper + a zero-dep OTLP-HTTP-JSON span exporter (/otlp-http subpath), and pins ABS_ATTRS semantic conventions so spans from runtime / sync / queue / router / secrets all use the same attribute names.",
 	"repository": {
 		"type": "git",
@@ -27,7 +27,7 @@
 		"absolutejs"
 	],
 	"scripts": {
-		"build": "rm -rf dist && bun build src/index.ts src/otlpHttp.ts --outdir dist --root src --sourcemap --target=bun && tsc --project tsconfig.build.json",
+		"build": "rm -rf dist && bun build src/index.ts src/otlpHttp.ts src/agent.ts --outdir dist --root src --sourcemap --target=bun && tsc --project tsconfig.build.json",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write \"./**/*.{ts,json,md}\"",
@@ -48,6 +48,11 @@
 			"types": "./dist/otlpHttp.d.ts",
 			"import": "./dist/otlpHttp.js",
 			"default": "./dist/otlpHttp.js"
+		},
+		"./agent": {
+			"types": "./dist/agent.d.ts",
+			"import": "./dist/agent.js",
+			"default": "./dist/agent.js"
 		}
 	},
 	"files": [

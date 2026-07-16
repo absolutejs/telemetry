@@ -3,6 +3,12 @@
 Tiny shared OpenTelemetry substrate for the AbsoluteJS substrate
 packages.
 
+It also ships a provider-neutral agent observer at
+`@absolutejs/telemetry/agent`. Pass `createAgentTelemetryObserver(tracer)`
+directly as `@absolutejs/agent-runtime`'s `onEvent` callback to correlate
+runs, signed discovery identities, steps, effects, budgets, and failures.
+Prompts and effect payloads are excluded, and actor IDs are private by default.
+
 **Docs:** [absolutejs.com/documentation/telemetry-overview](https://absolutejs.com/documentation/telemetry-overview)
 
 **What it is.** Type-replicated OTel surface + noop implementations +

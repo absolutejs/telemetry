@@ -286,7 +286,30 @@ export const ABS_ATTRS = {
 	secretFingerprint: 'abs.secret.fingerprint',
 
 	// audit
-	auditKind: 'abs.audit.kind'
+	auditKind: 'abs.audit.kind',
+
+	// provider-neutral AI agents
+	agentRunId: 'abs.agent.run.id',
+	agentParentRunId: 'abs.agent.run.parent_id',
+	agentStatus: 'abs.agent.run.status',
+	agentDescriptorId: 'abs.agent.descriptor.id',
+	agentDescriptorVersion: 'abs.agent.descriptor.version',
+	agentDescriptorDigest: 'abs.agent.descriptor.digest',
+	agentActorTenantId: 'abs.agent.actor.tenant_id',
+	agentActorUserId: 'abs.agent.actor.user_id',
+	agentActorAgentId: 'abs.agent.actor.agent_id',
+	agentDelegationId: 'abs.agent.delegation.id',
+	agentStepId: 'abs.agent.step.id',
+	agentStepSequence: 'abs.agent.step.sequence',
+	agentStepKind: 'abs.agent.step.kind',
+	agentEffectName: 'abs.agent.effect.name',
+	agentWorkerId: 'abs.agent.worker.id',
+	agentBudgetActions: 'abs.agent.budget.actions',
+	agentBudgetCostMicros: 'abs.agent.budget.cost_micros',
+	agentBudgetInputTokens: 'abs.agent.budget.input_tokens',
+	agentBudgetOutputTokens: 'abs.agent.budget.output_tokens',
+	agentBudgetSpendMinor: 'abs.agent.budget.spend_minor',
+	agentBudgetWallTimeMs: 'abs.agent.budget.wall_time_ms'
 } as const;
 
 export type AbsAttrName = (typeof ABS_ATTRS)[keyof typeof ABS_ATTRS];
