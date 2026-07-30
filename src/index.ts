@@ -44,6 +44,8 @@
  * handler runs.
  */
 
+import type { HandoffEvidence, HandoffSummary } from '@absolutejs/handoff';
+
 // -----------------------------------------------------------------------------
 // Type-replicated OTel surface
 // -----------------------------------------------------------------------------
@@ -288,6 +290,15 @@ export const ABS_ATTRS = {
 	// audit
 	auditKind: 'abs.audit.kind',
 
+	// work handed to external systems
+	handoffCorrelationId: 'abs.handoff.correlation_id',
+	handoffOperation: 'abs.handoff.operation',
+	handoffOutcome: 'abs.handoff.outcome',
+	handoffService: 'abs.handoff.service',
+	handoffSource: 'abs.handoff.source',
+	handoffAttempt: 'abs.handoff.attempt',
+	handoffContradiction: 'abs.handoff.contradiction',
+
 	// provider-neutral AI agents
 	agentRunId: 'abs.agent.run.id',
 	agentParentRunId: 'abs.agent.run.parent_id',
@@ -313,6 +324,34 @@ export const ABS_ATTRS = {
 } as const;
 
 export type AbsAttrName = (typeof ABS_ATTRS)[keyof typeof ABS_ATTRS];
+
+/**
+ * Privacy-safe span attributes for one external-system observation. Message,
+ * reference, external id, and customer data are deliberately excluded.
+ */
+export const handoffSpanAttributes = (
+	evidence: HandoffEvidence
+): Attributes => ({
+	[ABS_ATTRS.handoffCorrelationId]: evidence.correlationId,
+	[ABS_ATTRS.handoffOperation]: evidence.operation,
+	[ABS_ATTRS.handoffOutcome]: evidence.outcome,
+	[ABS_ATTRS.handoffService]: evidence.service,
+	[ABS_ATTRS.handoffSource]: evidence.source,
+	...(evidence.attempt === undefined
+		? {}
+		: { [ABS_ATTRS.handoffAttempt]: evidence.attempt })
+});
+
+/** Summary attributes for reconciliation or contradiction spans. */
+export const handoffSummarySpanAttributes = (
+	summary: HandoffSummary
+): Attributes => ({
+	[ABS_ATTRS.handoffContradiction]: summary.contradiction,
+	[ABS_ATTRS.handoffCorrelationId]: summary.correlationId,
+	[ABS_ATTRS.handoffOperation]: summary.operation,
+	[ABS_ATTRS.handoffOutcome]: summary.status,
+	[ABS_ATTRS.handoffService]: summary.service
+});
 
 // -----------------------------------------------------------------------------
 // Convenience wrappers for the common pattern

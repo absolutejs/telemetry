@@ -4,6 +4,8 @@ import {
 	createNoopSpan,
 	createNoopTracer,
 	createNoopTracerProvider,
+	handoffSpanAttributes,
+	handoffSummarySpanAttributes,
 	SpanKind,
 	SpanStatusCode,
 	tracerOrNoop,
@@ -138,6 +140,55 @@ describe('noop tracer / span / provider', () => {
 			}
 		);
 		expect(result).toBe('ok');
+	});
+});
+
+describe('handoff semantic conventions', () => {
+	test('excludes high-risk evidence fields from span attributes', () => {
+		const attributes = handoffSpanAttributes({
+			at: 1,
+			attempt: 2,
+			correlationId: 'handoff-1',
+			externalId: 'external-secret',
+			message: 'customer-visible error',
+			operation: 'invoice_payment',
+			outcome: 'failed',
+			reference: 'private-reference',
+			service: 'gateway',
+			source: 'external_surface_report'
+		});
+
+		expect(attributes).toEqual({
+			[ABS_ATTRS.handoffAttempt]: 2,
+			[ABS_ATTRS.handoffCorrelationId]: 'handoff-1',
+			[ABS_ATTRS.handoffOperation]: 'invoice_payment',
+			[ABS_ATTRS.handoffOutcome]: 'failed',
+			[ABS_ATTRS.handoffService]: 'gateway',
+			[ABS_ATTRS.handoffSource]: 'external_surface_report'
+		});
+		expect(JSON.stringify(attributes)).not.toContain('external-secret');
+		expect(JSON.stringify(attributes)).not.toContain('private-reference');
+	});
+
+	test('projects contradiction summaries without evidence payloads', () => {
+		expect(
+			handoffSummarySpanAttributes({
+				authoritativeOutcome: 'succeeded',
+				contradiction: true,
+				correlationId: 'handoff-1',
+				latest: null,
+				operation: 'invoice_payment',
+				reportedOutcome: 'failed',
+				service: 'gateway',
+				status: 'succeeded'
+			})
+		).toEqual({
+			[ABS_ATTRS.handoffContradiction]: true,
+			[ABS_ATTRS.handoffCorrelationId]: 'handoff-1',
+			[ABS_ATTRS.handoffOperation]: 'invoice_payment',
+			[ABS_ATTRS.handoffOutcome]: 'succeeded',
+			[ABS_ATTRS.handoffService]: 'gateway'
+		});
 	});
 });
 

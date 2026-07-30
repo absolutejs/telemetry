@@ -175,6 +175,15 @@ abs.secret.fingerprint
 
 // audit
 abs.audit.kind
+
+// handoff
+abs.handoff.correlation_id
+abs.handoff.operation
+abs.handoff.outcome
+abs.handoff.service
+abs.handoff.source
+abs.handoff.attempt
+abs.handoff.contradiction
 ```
 
 Adding NEW attributes is a minor bump; renaming an existing one is a
@@ -187,6 +196,10 @@ old name).
 `SpanStatusCode`, `SpanKind`, `SpanOptions`, `Attributes`,
 `AttributeValue`, `AbsAttrName`. Mirror `@opentelemetry/api` exactly;
 a real OTel `TracerProvider` satisfies these types structurally.
+
+`handoffSpanAttributes()` and `handoffSummarySpanAttributes()` project
+`@absolutejs/handoff` evidence into these conventions without copying messages,
+references, external ids, raw payloads, or customer data into spans.
 
 ## License
 
