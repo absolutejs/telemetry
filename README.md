@@ -9,7 +9,7 @@ directly as `@absolutejs/agent-runtime`'s `onEvent` callback to correlate
 runs, signed discovery identities, steps, effects, budgets, and failures.
 Prompts and effect payloads are excluded, and actor IDs are private by default.
 
-**Docs:** [absolutejs.com/documentation/telemetry-overview](https://absolutejs.com/documentation/telemetry-overview)
+**Docs:** [absolutejs.com/documentation/telemetry-package](https://absolutejs.com/documentation/telemetry-package)
 
 **What it is.** Type-replicated OTel surface + noop implementations +
 the `tracerOrNoop()` helper + `ABS_ATTRS` semantic conventions. ~250
