@@ -474,3 +474,22 @@ export const readActiveTraceId = async (): Promise<string | undefined> => {
 		return undefined;
 	}
 };
+
+export {
+	createMemoryTraceStore,
+	createTraceStoreSpanExporter,
+	projectStoredSpan,
+	type ReadableSpanLike,
+	type SpanExportResult,
+	type StoredSpan,
+	type StoredSpanEvent,
+	type StoredSpanLink,
+	type StoredSpanProjectionOptions,
+	type TelemetryAttributes,
+	type TelemetryAttributeScalar,
+	type TelemetryAttributeValue,
+	type TraceFilter,
+	type TraceStore,
+	type TraceStoreSpanExporter,
+	type TraceSummary
+} from './store';

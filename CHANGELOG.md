@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] — 2026-08-07
+
+### Added — durable trace storage
+
+- Added the provider-neutral `TraceStore` contract, bounded stored-span model,
+  memory implementation, and an OpenTelemetry SDK-compatible span exporter.
+- Added `@absolutejs/telemetry/drizzle` with idempotent PostgreSQL/Neon writes,
+  complete trace lookup, recent trace summaries, and retention pruning.
+- Span projection drops secret-bearing attributes, removes URL query/hash
+  values, bounds high-cardinality collections, and preserves nanosecond time.
+- Added real PGlite coverage for persistence, deduplication, querying, and
+  retention alongside exporter and privacy-boundary tests.
+
 ## [0.1.0] — 2026-05-31
 
 Closes the third piece of G9 (observability triad) — the substrate
