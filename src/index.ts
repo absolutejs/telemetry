@@ -476,6 +476,7 @@ export const readActiveTraceId = async (): Promise<string | undefined> => {
 };
 
 export {
+	createFanoutSpanExporter,
 	createMemoryTraceStore,
 	createTraceStoreSpanExporter,
 	projectStoredSpan,
@@ -488,8 +489,15 @@ export {
 	type TelemetryAttributes,
 	type TelemetryAttributeScalar,
 	type TelemetryAttributeValue,
+	type TraceAnalyticsFilter,
+	type TraceAnalyticsStore,
 	type TraceFilter,
+	type TraceSeriesFilter,
+	type TraceSeriesPoint,
+	type TraceServiceEdge,
+	type TraceServiceSummary,
 	type TraceStore,
+	type TraceStoreStats,
 	type TraceStoreSpanExporter,
 	type TraceSummary
 } from './store';

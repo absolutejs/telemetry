@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { drizzle } from "drizzle-orm/pglite";
 import { createDrizzleTraceStore } from "../src/drizzle";
 import {
+  createFanoutSpanExporter,
   createMemoryTraceStore,
   createTraceStoreSpanExporter,
   projectStoredSpan,
@@ -16,6 +17,8 @@ const childTraceId = "fedcba9876543210fedcba9876543210";
 const readableSpan = (overrides: Partial<ReadableSpanLike> = {}) =>
   ({
     attributes: {
+      "db.statement": "select private from credentials",
+      "http.request.body": "private body",
       "http.request.header.authorization": "Bearer private",
       "http.url": "https://absolutejs.ai/path?token=private#fragment",
       tenant: "tenant-1",
@@ -93,6 +96,17 @@ describe("trace storage", () => {
     expect(span.startedAtUnixNano).toBe("1800000000100000000");
   });
 
+  test("supports application-specific attribute allowlists", () => {
+    const span = projectStoredSpan(readableSpan(), {
+      attributeFilter: (key) => key === "tenant" || key === "service.name",
+    });
+
+    expect(span.attributes).toEqual({ tenant: "tenant-1" });
+    expect(span.resourceAttributes).toEqual({
+      "service.name": "absolutejs-saas",
+    });
+  });
+
   test("exports SDK-shaped spans through the pluggable store contract", async () => {
     const store = createMemoryTraceStore();
     const exporter = createTraceStoreSpanExporter({ store });
@@ -126,6 +140,120 @@ describe("trace storage", () => {
     expect(await store.prune("1800000000300000000")).toBe(1);
     expect(await store.getTrace(traceId)).toHaveLength(1);
   });
+
+  test("fans out exports and reports partial failures", async () => {
+    const successful = createTraceStoreSpanExporter({
+      store: createMemoryTraceStore(),
+    });
+    const failure = new Error("collector unavailable");
+    const failing = {
+      export: (
+        _spans: ReadableSpanLike[],
+        callback: (result: { code: 1; error: Error }) => void,
+      ) => callback({ code: 1, error: failure }),
+      forceFlush: () => Promise.reject(failure),
+      shutdown: () => Promise.resolve(),
+    };
+    const exporter = createFanoutSpanExporter({
+      exporters: [successful, failing],
+    });
+    const result = await new Promise<{ code: number; error?: Error }>(
+      (resolve) => exporter.export([readableSpan()], resolve),
+    );
+
+    expect(result.code).toBe(1);
+    expect(result.error).toBeInstanceOf(AggregateError);
+    await expect(exporter.forceFlush()).rejects.toBeInstanceOf(AggregateError);
+    await exporter.shutdown();
+  });
+});
+
+const expectAnalytics = async (
+  store: ReturnType<typeof createMemoryTraceStore>,
+) => {
+  expect(await store.getStats()).toEqual({
+    errorSpanCount: 1,
+    newestStartedAtUnixNano: "1800000000110000000",
+    oldestStartedAtUnixNano: "1800000000100000000",
+    serviceCount: 2,
+    spanCount: 2,
+    traceCount: 1,
+  });
+  expect(await store.listServices()).toEqual([
+    {
+      errorSpanCount: 0,
+      p95DurationNano: "25000000",
+      serviceName: "absolutejs-saas",
+      spanCount: 1,
+      traceCount: 1,
+    },
+    {
+      errorSpanCount: 1,
+      p95DurationNano: "20000000",
+      serviceName: "postgres",
+      spanCount: 1,
+      traceCount: 1,
+    },
+  ]);
+  expect(await store.getServiceMap()).toEqual([
+    {
+      errorSpanCount: 1,
+      sourceServiceName: "absolutejs-saas",
+      spanCount: 1,
+      targetServiceName: "postgres",
+      traceCount: 1,
+    },
+  ]);
+  expect(await store.getTraceSeries({ bucketSeconds: 60 })).toEqual([
+    {
+      bucketStartedAtUnixNano: "1800000000000000000",
+      errorSpanCount: 1,
+      p50DurationNano: "22500000",
+      p95DurationNano: "24750000",
+      spanCount: 2,
+      traceCount: 1,
+    },
+  ]);
+  expect(await store.listTraces({ name: "database" })).toEqual([
+    {
+      durationNano: "30000000",
+      endedAtUnixNano: "1800000000130000000",
+      errorSpanCount: 1,
+      rootName: "request",
+      serviceNames: ["absolutejs-saas", "postgres"],
+      spanCount: 2,
+      startedAtUnixNano: "1800000000100000000",
+      traceId,
+    },
+  ]);
+  expect(
+    await store.listTraces({
+      errorOnly: true,
+      minimumDurationNano: "30000000",
+    }),
+  ).toHaveLength(1);
+  expect(await store.listTraces({ maximumDurationNano: "29999999" })).toEqual(
+    [],
+  );
+};
+
+test("memory trace store exposes operational analytics", async () => {
+  const store = createMemoryTraceStore();
+  const root = storedSpan();
+  await store.write([
+    root,
+    storedSpan({
+      durationNano: "20000000",
+      endedAtUnixNano: "1800000000130000000",
+      name: "database",
+      parentSpanId: root.spanId,
+      serviceName: "postgres",
+      spanId: "1122334455667788",
+      startedAtUnixNano: "1800000000110000000",
+      statusCode: 2,
+    }),
+  ]);
+  await expectAnalytics(store);
 });
 
 describe("createDrizzleTraceStore", () => {
@@ -161,9 +289,11 @@ describe("createDrizzleTraceStore", () => {
     const store = createDrizzleTraceStore({ db: drizzle({ client }) });
     const root = storedSpan();
     const child = storedSpan({
+      durationNano: "20000000",
       endedAtUnixNano: "1800000000130000000",
       name: "database",
       parentSpanId: root.spanId,
+      serviceName: "postgres",
       spanId: "1122334455667788",
       startedAtUnixNano: "1800000000110000000",
       statusCode: 2,
@@ -178,12 +308,13 @@ describe("createDrizzleTraceStore", () => {
         endedAtUnixNano: "1800000000130000000",
         errorSpanCount: 1,
         rootName: "request",
-        serviceNames: ["absolutejs-saas"],
+        serviceNames: ["absolutejs-saas", "postgres"],
         spanCount: 2,
         startedAtUnixNano: "1800000000100000000",
         traceId,
       },
     ]);
+    await expectAnalytics(store);
     expect(await store.prune("1800000000200000000")).toBe(2);
     expect(await store.getTrace(traceId)).toEqual([]);
     await client.close();

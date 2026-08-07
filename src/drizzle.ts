@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, ne, sql, type SQL } from "drizzle-orm";
 import {
   bigint,
   customType,
@@ -8,6 +8,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  alias,
   type PgAsyncDatabase,
 } from "drizzle-orm/pg-core";
 import type {
@@ -15,8 +16,10 @@ import type {
   StoredSpanEvent,
   StoredSpanLink,
   TelemetryAttributes,
+  TraceAnalyticsFilter,
   TraceFilter,
-  TraceStore,
+  TraceAnalyticsStore,
+  TraceSeriesFilter,
   TraceSummary,
 } from "./store";
 
@@ -182,9 +185,33 @@ const conditionsFor = (filter: TraceFilter): Array<SQL | undefined> => [
     : undefined,
 ];
 
+const analyticsConditionsFor = (filter: TraceAnalyticsFilter) =>
+  conditionsFor(filter);
+
+const traceHavingFor = (filter: TraceFilter): Array<SQL | undefined> => [
+  filter.name
+    ? sql`bool_or(${telemetrySpans.name} ilike ${`%${filter.name}%`})`
+    : undefined,
+  filter.errorOnly
+    ? sql`count(*) filter (where ${telemetrySpans.statusCode} = 2) > 0`
+    : undefined,
+  filter.minimumDurationNano
+    ? sql`max(${telemetrySpans.endedAtUnixNano}) - min(${telemetrySpans.startedAtUnixNano}) >= ${BigInt(filter.minimumDurationNano)}`
+    : undefined,
+  filter.maximumDurationNano
+    ? sql`max(${telemetrySpans.endedAtUnixNano}) - min(${telemetrySpans.startedAtUnixNano}) <= ${BigInt(filter.maximumDurationNano)}`
+    : undefined,
+  filter.cursorStartedAtUnixNano
+    ? sql`min(${telemetrySpans.startedAtUnixNano}) < ${BigInt(filter.cursorStartedAtUnixNano)}`
+    : undefined,
+];
+
+const percentileDuration = (fraction: number) =>
+  sql<bigint>`coalesce(percentile_cont(${fraction}) within group (order by ${telemetrySpans.durationNano}), 0)::bigint`;
+
 export const createDrizzleTraceStore = <DB extends AnyPgDatabase>({
   db,
-}: CreateDrizzleTraceStoreOptions<DB>): TraceStore => ({
+}: CreateDrizzleTraceStoreOptions<DB>): TraceAnalyticsStore => ({
   getTrace: async (traceId) => {
     const rows = await db
       .select()
@@ -213,6 +240,7 @@ export const createDrizzleTraceStore = <DB extends AnyPgDatabase>({
       .from(telemetrySpans)
       .where(and(...conditionsFor(filter)))
       .groupBy(telemetrySpans.traceId)
+      .having(and(...traceHavingFor(filter)))
       .orderBy(desc(sql`min(${telemetrySpans.startedAtUnixNano})`))
       .limit(Math.max(1, Math.min(filter.limit ?? 100, 1_000)));
     return rows.map(
@@ -227,6 +255,114 @@ export const createDrizzleTraceStore = <DB extends AnyPgDatabase>({
         traceId: row.traceId,
       }),
     );
+  },
+  getServiceMap: async (filter = {}) => {
+    const parent = alias(telemetrySpans, "parent_spans");
+    const rows = await db
+      .select({
+        errorSpanCount: sql<number>`count(*) filter (where ${telemetrySpans.statusCode} = 2)::integer`,
+        sourceServiceName: parent.serviceName,
+        spanCount: sql<number>`count(*)::integer`,
+        targetServiceName: telemetrySpans.serviceName,
+        traceCount: sql<number>`count(distinct ${telemetrySpans.traceId})::integer`,
+      })
+      .from(telemetrySpans)
+      .innerJoin(
+        parent,
+        and(
+          eq(parent.traceId, telemetrySpans.traceId),
+          eq(parent.spanId, telemetrySpans.parentSpanId),
+        ),
+      )
+      .where(
+        and(
+          ...analyticsConditionsFor(filter),
+          ne(parent.serviceName, telemetrySpans.serviceName),
+        ),
+      )
+      .groupBy(parent.serviceName, telemetrySpans.serviceName)
+      .orderBy(desc(sql`count(*)`));
+    return rows;
+  },
+  getStats: async (filter = {}) => {
+    const [row] = await db
+      .select({
+        errorSpanCount: sql<number>`count(*) filter (where ${telemetrySpans.statusCode} = 2)::integer`,
+        newestStartedAtUnixNano: sql<
+          bigint | null
+        >`max(${telemetrySpans.startedAtUnixNano})`,
+        oldestStartedAtUnixNano: sql<
+          bigint | null
+        >`min(${telemetrySpans.startedAtUnixNano})`,
+        serviceCount: sql<number>`count(distinct ${telemetrySpans.serviceName})::integer`,
+        spanCount: sql<number>`count(*)::integer`,
+        traceCount: sql<number>`count(distinct ${telemetrySpans.traceId})::integer`,
+      })
+      .from(telemetrySpans)
+      .where(and(...analyticsConditionsFor(filter)));
+    if (!row)
+      return {
+        errorSpanCount: 0,
+        serviceCount: 0,
+        spanCount: 0,
+        traceCount: 0,
+      };
+    return {
+      errorSpanCount: row.errorSpanCount,
+      ...(row.newestStartedAtUnixNano === null
+        ? {}
+        : { newestStartedAtUnixNano: row.newestStartedAtUnixNano.toString() }),
+      ...(row.oldestStartedAtUnixNano === null
+        ? {}
+        : { oldestStartedAtUnixNano: row.oldestStartedAtUnixNano.toString() }),
+      serviceCount: row.serviceCount,
+      spanCount: row.spanCount,
+      traceCount: row.traceCount,
+    };
+  },
+  getTraceSeries: async (filter: TraceSeriesFilter = {}) => {
+    const bucketNano =
+      BigInt(Math.max(1, Math.floor(filter.bucketSeconds ?? 60))) *
+      1_000_000_000n;
+    const bucketLiteral = sql.raw(bucketNano.toString());
+    const bucketStartedAtUnixNano = sql<bigint>`(floor(${telemetrySpans.startedAtUnixNano}::numeric / ${bucketLiteral}::numeric) * ${bucketLiteral}::numeric)::bigint`;
+    const rows = await db
+      .select({
+        bucketStartedAtUnixNano,
+        errorSpanCount: sql<number>`count(*) filter (where ${telemetrySpans.statusCode} = 2)::integer`,
+        p50DurationNano: percentileDuration(0.5),
+        p95DurationNano: percentileDuration(0.95),
+        spanCount: sql<number>`count(*)::integer`,
+        traceCount: sql<number>`count(distinct ${telemetrySpans.traceId})::integer`,
+      })
+      .from(telemetrySpans)
+      .where(and(...analyticsConditionsFor(filter)))
+      .groupBy(bucketStartedAtUnixNano)
+      .orderBy(asc(bucketStartedAtUnixNano));
+    return rows.map((row) => ({
+      ...row,
+      bucketStartedAtUnixNano: row.bucketStartedAtUnixNano.toString(),
+      p50DurationNano: row.p50DurationNano.toString(),
+      p95DurationNano: row.p95DurationNano.toString(),
+    }));
+  },
+  listServices: async (filter = {}) => {
+    const rows = await db
+      .select({
+        errorSpanCount: sql<number>`count(*) filter (where ${telemetrySpans.statusCode} = 2)::integer`,
+        p95DurationNano: percentileDuration(0.95),
+        serviceName: telemetrySpans.serviceName,
+        spanCount: sql<number>`count(*)::integer`,
+        traceCount: sql<number>`count(distinct ${telemetrySpans.traceId})::integer`,
+      })
+      .from(telemetrySpans)
+      .where(and(...analyticsConditionsFor(filter)))
+      .groupBy(telemetrySpans.serviceName)
+      .orderBy(desc(sql`count(*)`));
+    return rows.map((row) => ({
+      ...row,
+      p95DurationNano: row.p95DurationNano.toString(),
+    }));
   },
   prune: async (beforeUnixNano) => {
     const deleted = await db
