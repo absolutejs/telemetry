@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/telemetry",
-  "version": "0.2.1",
+	"version": "0.3.1",
 	"description": "Tiny shared OpenTelemetry substrate for the AbsoluteJS ecosystem. Type-replicates @opentelemetry/api's Tracer/Span shape, ships noop implementations + a tracerOrNoop helper + a zero-dep OTLP-HTTP-JSON span exporter (/otlp-http subpath), and pins ABS_ATTRS semantic conventions so spans from runtime / sync / queue / router / secrets all use the same attribute names.",
 	"repository": {
 		"type": "git",
@@ -27,7 +27,7 @@
 		"absolutejs"
 	],
 	"scripts": {
-    "build": "rm -rf dist && bun build src/index.ts src/otlpHttp.ts src/agent.ts --outdir dist --root src --sourcemap --target=bun --external @absolutejs/handoff && tsc --project tsconfig.build.json",
+    "build": "rm -rf dist && bun build src/index.ts src/otlpHttp.ts src/agent.ts src/store.ts src/drizzle.ts --outdir dist --root src --sourcemap --target=bun --external @absolutejs/handoff --external drizzle-orm --external 'drizzle-orm/*' && tsc --project tsconfig.build.json",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write \"./**/*.{ts,json,md}\"",
@@ -37,7 +37,9 @@
     "@absolutejs/handoff": "0.1.0"
   },
   "devDependencies": {
+		"@electric-sql/pglite": "0.3.14",
 		"@types/bun": "1.3.14",
+		"drizzle-orm": "1.0.0-rc.4",
 		"prettier": "3.5.3",
 		"typescript": "5.8.3"
 	},
@@ -56,6 +58,19 @@
 			"types": "./dist/agent.d.ts",
 			"import": "./dist/agent.js",
 			"default": "./dist/agent.js"
+		},
+		"./drizzle": {
+			"types": "./dist/drizzle.d.ts",
+			"import": "./dist/drizzle.js",
+			"default": "./dist/drizzle.js"
+		}
+	},
+	"peerDependencies": {
+		"drizzle-orm": ">=1.0.0-rc.4 <2"
+	},
+	"peerDependenciesMeta": {
+		"drizzle-orm": {
+			"optional": true
 		}
 	},
 	"files": [

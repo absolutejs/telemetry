@@ -46,6 +46,31 @@ The package has **no** runtime dependencies. It does not peer-dep
 `@opentelemetry/api` — its types are structurally compatible, so a
 real OTel `TracerProvider` satisfies the shape this package expects.
 
+## Durable trace storage
+
+`@absolutejs/telemetry` owns the provider-neutral `TraceStore` contract.
+`createTraceStoreSpanExporter()` projects OpenTelemetry SDK spans into a
+bounded, credential-safe stored shape and writes batches through that contract.
+It drops secret-bearing attribute keys, strips URL query/hash values, bounds
+attributes/events/links, drops request/response bodies and database statements
+by default, supports an application-specific attribute allowlist, and preserves
+nanosecond timestamps as strings.
+
+`createFanoutSpanExporter()` sends each batch to multiple exporters and reports
+partial failures without hiding a healthy destination. This supports durable
+first-party storage alongside an optional OTLP collector without coupling the
+storage contract to either provider.
+
+Use `createMemoryTraceStore()` for tests. For production PostgreSQL/Neon
+storage, import `createDrizzleTraceStore()` and `telemetryDrizzleSchema` from
+`@absolutejs/telemetry/drizzle`. The exported table is intended for host-owned
+Drizzle migrations. Writes are idempotent on `(trace_id, span_id)`; the store
+supports filtered trace summaries, complete trace retrieval, retention through
+`prune()`, aggregate storage statistics, bucketed error/latency time series,
+per-service health summaries, and a parent/child service dependency map without
+prescribing a hosted observability vendor. The in-memory implementation exposes
+the same `TraceAnalyticsStore` interface for local development and tests.
+
 ## Usage
 
 ### As a substrate-package author
