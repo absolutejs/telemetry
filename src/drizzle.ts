@@ -23,36 +23,46 @@ import type {
   TraceSummary,
 } from "./store";
 
+/*
+ * JSON goes to the database as text and is cast to jsonb there. Handing the
+ * driver a value and letting it encode it is not portable: Bun's SQL encodes
+ * whatever it is given for a jsonb parameter as JSON, so the stringified
+ * object these columns used to send was stored as a JSON *string* (invisible
+ * to ->>, @> and jsonb_typeof = 'object'), and node-postgres sends a plain
+ * array as a Postgres array. Text cast with an explicit ::text is a real
+ * object or array under every driver.
+ *
+ * Reading still accepts a string, for rows written before this (and drivers
+ * that hand jsonb back as text).
+ */
+const jsonText = (value: unknown) =>
+  sql`(${JSON.stringify(value)}::text)::jsonb`;
+const fromJson = <Value>(value: unknown) =>
+  (typeof value === "string" ? JSON.parse(value) : value) as Value;
+
 const attributesJsonb = customType<{
   data: TelemetryAttributes;
   driverData: unknown;
 }>({
   dataType: () => "jsonb",
-  fromDriver: (value) =>
-    (typeof value === "string"
-      ? JSON.parse(value)
-      : value) as TelemetryAttributes,
-  toDriver: (value) => JSON.stringify(value),
+  fromDriver: (value) => fromJson<TelemetryAttributes>(value),
+  toDriver: jsonText,
 });
 const eventsJsonb = customType<{
   data: StoredSpanEvent[];
   driverData: unknown;
 }>({
   dataType: () => "jsonb",
-  fromDriver: (value) =>
-    (typeof value === "string"
-      ? JSON.parse(value)
-      : value) as StoredSpanEvent[],
-  toDriver: (value) => JSON.stringify(value),
+  fromDriver: (value) => fromJson<StoredSpanEvent[]>(value),
+  toDriver: jsonText,
 });
 const linksJsonb = customType<{
   data: StoredSpanLink[];
   driverData: unknown;
 }>({
   dataType: () => "jsonb",
-  fromDriver: (value) =>
-    (typeof value === "string" ? JSON.parse(value) : value) as StoredSpanLink[],
-  toDriver: (value) => JSON.stringify(value),
+  fromDriver: (value) => fromJson<StoredSpanLink[]>(value),
+  toDriver: jsonText,
 });
 
 export const telemetrySpans = pgTable(
