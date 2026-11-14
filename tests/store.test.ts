@@ -320,3 +320,85 @@ describe("createDrizzleTraceStore", () => {
     await client.close();
   });
 });
+
+describe("createDrizzleTraceStore JSON columns", () => {
+  const tableSql = `CREATE TABLE telemetry_spans (
+				attributes jsonb NOT NULL,
+				duration_nano bigint NOT NULL,
+				ended_at timestamptz NOT NULL,
+				ended_at_unix_nano bigint NOT NULL,
+				events jsonb NOT NULL,
+				ingested_at timestamptz NOT NULL DEFAULT now(),
+				kind integer NOT NULL,
+				links jsonb NOT NULL,
+				name text NOT NULL,
+				parent_span_id text,
+				resource_attributes jsonb NOT NULL,
+				scope_name text NOT NULL,
+				scope_version text,
+				service_name text NOT NULL,
+				span_id text NOT NULL,
+				started_at timestamptz NOT NULL,
+				started_at_unix_nano bigint NOT NULL,
+				status_code integer NOT NULL,
+				status_message text,
+				trace_flags integer NOT NULL,
+				trace_id text NOT NULL,
+				trace_state text,
+				PRIMARY KEY (trace_id, span_id)
+			)`;
+
+  test("stores attributes, events and links as JSON objects and arrays SQL can query", async () => {
+    const client = new PGlite();
+    await client.exec(tableSql);
+    const store = createDrizzleTraceStore({ db: drizzle({ client }) });
+    await store.write([
+      storedSpan({
+        attributes: { "project.id": "p1", retries: 2 },
+        events: [
+          {
+            attributes: {},
+            name: "ready",
+            timeUnixNano: "1800000000100000000",
+          },
+        ],
+      }),
+    ]);
+
+    const result = await client.query<{
+      attributes: string;
+      events: string;
+      links: string;
+      project: string;
+    }>(
+      `select jsonb_typeof(attributes) as attributes, jsonb_typeof(events) as events,
+              jsonb_typeof(links) as links, attributes->>'project.id' as project
+         from telemetry_spans`,
+    );
+
+    expect(result.rows[0]).toEqual({
+      attributes: "object",
+      events: "array",
+      links: "array",
+      project: "p1",
+    });
+  });
+
+  test("still reads rows written as JSON strings by earlier versions", async () => {
+    const client = new PGlite();
+    await client.exec(tableSql);
+    const store = createDrizzleTraceStore({ db: drizzle({ client }) });
+    const span = storedSpan({ attributes: { "project.id": "p1" } });
+    await store.write([span]);
+    // How 0.3.1 and earlier stored them through Bun's SQL.
+    await client.exec(
+      `update telemetry_spans set attributes = to_jsonb(attributes::text),
+         events = to_jsonb(events::text), links = to_jsonb(links::text)`,
+    );
+
+    const [read] = await store.getTrace(span.traceId);
+
+    expect(read?.attributes).toEqual({ "project.id": "p1" });
+    expect(Array.isArray(read?.events)).toBe(true);
+  });
+});

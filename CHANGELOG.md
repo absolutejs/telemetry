@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.2] — 2026-11-14
+
+### Fixed — JSON columns stored as JSON strings
+
+- The Drizzle trace store's `attributes`, `resource_attributes`, `events` and
+  `links` columns are written as text cast to `jsonb`, so they are stored as
+  JSON objects and arrays under every driver. Through Bun's SQL, 0.3.1 and
+  earlier stored them as JSON _strings_, which SQL could not look inside
+  (`->>`, `@>`, `jsonb_typeof`). Reading still accepts rows stored as strings;
+  existing rows can be converted in place with
+  `update telemetry_spans set attributes = (attributes #>> '{}')::jsonb where jsonb_typeof(attributes) = 'string'`
+  (and the same for the other three columns).
+
 ## [0.3.0] — 2026-08-07
 
 ### Added — durable trace storage
@@ -54,7 +67,7 @@ wire `@opentelemetry/sdk-node` themselves.
   deployment.environment / etc.
 - **Operator visibility.** `provider.metrics()` returns
   `{ queued, exported, droppedDueToQueueLimit, sampled,
-  notSampled, batches, batchErrors }`.
+notSampled, batches, batchErrors }`.
 - **`flush()` + `shutdown()`.** `flush()` drains the queue;
   `shutdown()` flushes + closes so further spans don't enqueue.
 
